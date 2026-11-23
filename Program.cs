@@ -9,7 +9,7 @@ namespace GjBridge
         public const string AppName = "搞机工具箱 · 本机桥接";
         public const string Brand = "sj.aikex.ink";
         public const string SiteUrl = "https://sj.aikex.ink/";
-        public const string Version = "1.7.1";
+        public const string Version = "1.7.2";
         public const int DefaultPort = 17855;
 
         public const string AuthorName = "艾阳";

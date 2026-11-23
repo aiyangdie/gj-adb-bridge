@@ -607,6 +607,8 @@ namespace GjBridge
         {
             TcpClient tcp = new TcpClient();
             tcp.NoDelay = true;
+            try { tcp.ReceiveBufferSize = 256 * 1024; } catch { }
+            try { tcp.SendBufferSize = 256 * 1024; } catch { }
             Exception connectError = null;
             try
             {
@@ -701,7 +703,8 @@ namespace GjBridge
                     {
                         ms.Write(buffer, 0, n);
                         int spin = 0;
-                        while (spin < 32)
+                        // 多拼几包再发，减少 WS 帧次数（镜像码流更顺）
+                        while (spin < 48)
                         {
                             int avail = 0;
                             try { avail = tcp.Available; } catch { avail = 0; }
