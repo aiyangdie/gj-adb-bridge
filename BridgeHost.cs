@@ -675,8 +675,8 @@ namespace GjBridge
                     // 拷贝后再写，避免底层 WS 缓冲与 NetworkStream 并发踩内存
                     byte[] chunk = new byte[result.Count];
                     Buffer.BlockCopy(buffer, 0, chunk, 0, result.Count);
+                    // 不逐包 Flush：交给 TCP 合并，镜像码流吞吐明显更好；NoDelay 已在建连时打开
                     await stream.WriteAsync(chunk, 0, chunk.Length, token).ConfigureAwait(false);
-                    await stream.FlushAsync(token).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException) { }
