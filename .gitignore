@@ -1,5 +1,9 @@
 bin/
+obj/
 dist/
 *.user
 *.suo
 .vs/
+_probe*
+_deploy*
+*.pdb

@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
@@ -12,23 +11,18 @@ namespace GjBridge
     internal sealed class MainForm : Form
     {
         private readonly BridgeHost _bridge = new BridgeHost();
-        private readonly bool _openAboutOnStart;
         private NotifyIcon _tray;
         private Label _statusTitle;
         private Label _statusDetail;
         private Label _adbLabel;
-        private Label _urlLabel;
         private Panel _dot;
         private System.Windows.Forms.Timer _timer;
         private bool _reallyExit;
         private Icon _appIcon;
         private Image _avatar;
 
-        public MainForm() : this(false) { }
-
-        public MainForm(bool openAboutOnStart)
+        public MainForm()
         {
-            _openAboutOnStart = openAboutOnStart;
             _appIcon = LoadAppIcon();
             _avatar = LoadAvatar();
             Text = Program.AppName;
@@ -37,8 +31,8 @@ namespace GjBridge
             MaximizeBox = false;
             MinimizeBox = true;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(460, 520);
-            BackColor = Color.FromArgb(241, 245, 249);
+            ClientSize = new Size(400, 420);
+            BackColor = Theme.Bg;
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             DoubleBuffered = true;
 
@@ -60,8 +54,7 @@ namespace GjBridge
             catch { }
             try
             {
-                Assembly asm = Assembly.GetExecutingAssembly();
-                using (Stream s = asm.GetManifestResourceStream("GjBridge.app.ico"))
+                using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("GjBridge.app.ico"))
                 {
                     if (s != null) return new Icon(s);
                 }
@@ -80,8 +73,7 @@ namespace GjBridge
             catch { }
             try
             {
-                Assembly asm = Assembly.GetExecutingAssembly();
-                using (Stream s = asm.GetManifestResourceStream("GjBridge.avatar.png"))
+                using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("GjBridge.avatar.png"))
                 {
                     if (s != null) return Image.FromStream(s);
                 }
@@ -94,205 +86,132 @@ namespace GjBridge
         {
             Panel header = new Panel();
             header.Dock = DockStyle.Top;
-            header.Height = 108;
+            header.Height = 88;
             header.Paint += delegate(object sender, PaintEventArgs e)
             {
-                Rectangle r = header.ClientRectangle;
-                using (LinearGradientBrush br = new LinearGradientBrush(r,
-                    Color.FromArgb(15, 118, 110), Color.FromArgb(20, 184, 166), 18f))
-                {
-                    e.Graphics.FillRectangle(br, r);
-                }
-                using (SolidBrush glow = new SolidBrush(Color.FromArgb(40, 255, 255, 255)))
-                {
-                    e.Graphics.FillEllipse(glow, r.Width - 120, -40, 180, 180);
-                }
+                using (SolidBrush br = new SolidBrush(Theme.Brand))
+                    e.Graphics.FillRectangle(br, header.ClientRectangle);
             };
             Controls.Add(header);
 
             if (_avatar != null)
             {
-                PictureBox avatarBox = new PictureBox();
-                avatarBox.Image = _avatar;
-                avatarBox.SizeMode = PictureBoxSizeMode.Zoom;
-                avatarBox.Size = new Size(52, 52);
-                avatarBox.Location = new Point(18, 28);
-                avatarBox.BackColor = Color.Transparent;
-                avatarBox.Cursor = Cursors.Hand;
-                avatarBox.Click += delegate { OpenUrl(Program.AuthorGithubUrl); };
-                header.Controls.Add(avatarBox);
+                PictureBox pic = new PictureBox();
+                pic.Image = _avatar;
+                pic.SizeMode = PictureBoxSizeMode.Zoom;
+                pic.Size = new Size(44, 44);
+                pic.Location = new Point(18, 22);
+                pic.Cursor = Cursors.Hand;
+                pic.Click += delegate { OpenUrl(Program.AuthorGithubUrl); };
+                header.Controls.Add(pic);
             }
 
+            int left = _avatar != null ? 74 : 18;
             Label brand = new Label();
-            brand.AutoSize = false;
-            brand.Text = Program.AppName;
+            brand.Text = "搞机工具箱";
             brand.ForeColor = Color.White;
-            brand.Font = new Font("Microsoft YaHei UI", 13.5F, FontStyle.Bold);
-            brand.Location = new Point(_avatar != null ? 80 : 20, 24);
-            brand.Size = new Size(360, 28);
+            brand.Font = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold);
+            brand.Location = new Point(left, 18);
+            brand.Size = new Size(300, 28);
             brand.BackColor = Color.Transparent;
             header.Controls.Add(brand);
 
             Label sub = new Label();
-            sub.AutoSize = false;
-            sub.Text = "本站维护 · " + Program.Brand + "  ·  v" + Program.Version;
-            sub.ForeColor = Color.FromArgb(204, 251, 241);
-            sub.Font = new Font("Microsoft YaHei UI", 9F);
-            sub.Location = new Point(_avatar != null ? 80 : 20, 56);
-            sub.Size = new Size(360, 22);
+            sub.Text = "本机桥接 · " + Program.Brand + "  v" + Program.Version;
+            sub.ForeColor = Color.FromArgb(220, 226, 255);
+            sub.Location = new Point(left, 48);
+            sub.Size = new Size(300, 22);
             sub.BackColor = Color.Transparent;
             header.Controls.Add(sub);
 
-            Label author = new Label();
-            author.AutoSize = false;
-            author.Text = "开源作者 @" + Program.AuthorGithub + " · 点头像进 GitHub";
-            author.ForeColor = Color.FromArgb(167, 243, 208);
-            author.Font = new Font("Microsoft YaHei UI", 8.5F);
-            author.Location = new Point(_avatar != null ? 80 : 20, 78);
-            author.Size = new Size(360, 20);
-            author.BackColor = Color.Transparent;
-            author.Cursor = Cursors.Hand;
-            author.Click += delegate { OpenUrl(Program.AuthorGithubUrl); };
-            header.Controls.Add(author);
-
-            Panel card = RoundedCard(20, 124, 420, 168);
+            Panel card = new Panel();
+            card.Location = new Point(18, 106);
+            card.Size = new Size(364, 140);
+            card.BackColor = Theme.Surface;
+            card.Paint += delegate(object s, PaintEventArgs e)
+            {
+                using (Pen pen = new Pen(Theme.Line))
+                    e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+            };
             Controls.Add(card);
 
             _dot = new Panel();
-            _dot.Size = new Size(12, 12);
-            _dot.Location = new Point(20, 24);
-            _dot.BackColor = Color.FromArgb(148, 163, 184);
+            _dot.Size = new Size(10, 10);
+            _dot.Location = new Point(18, 22);
+            _dot.BackColor = Theme.Muted;
             card.Controls.Add(_dot);
 
             _statusTitle = new Label();
             _statusTitle.Text = "正在启动…";
             _statusTitle.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
-            _statusTitle.ForeColor = Color.FromArgb(15, 23, 42);
-            _statusTitle.Location = new Point(42, 18);
-            _statusTitle.Size = new Size(350, 26);
+            _statusTitle.ForeColor = Theme.Ink;
+            _statusTitle.Location = new Point(36, 16);
+            _statusTitle.Size = new Size(310, 26);
             card.Controls.Add(_statusTitle);
 
             _statusDetail = new Label();
-            _statusDetail.Text = "启动本机 ADB 桥接服务";
-            _statusDetail.ForeColor = Color.FromArgb(100, 116, 139);
-            _statusDetail.Location = new Point(20, 52);
-            _statusDetail.Size = new Size(380, 22);
+            _statusDetail.Text = "启动桥接服务";
+            _statusDetail.ForeColor = Theme.Muted;
+            _statusDetail.Location = new Point(18, 52);
+            _statusDetail.Size = new Size(328, 22);
             card.Controls.Add(_statusDetail);
 
             _adbLabel = new Label();
             _adbLabel.Text = "ADB：检测中";
-            _adbLabel.ForeColor = Color.FromArgb(71, 85, 105);
-            _adbLabel.Location = new Point(20, 84);
-            _adbLabel.Size = new Size(380, 22);
+            _adbLabel.ForeColor = Theme.Muted;
+            _adbLabel.Location = new Point(18, 84);
+            _adbLabel.Size = new Size(328, 40);
             card.Controls.Add(_adbLabel);
 
-            _urlLabel = new Label();
-            _urlLabel.Text = "地址：—";
-            _urlLabel.ForeColor = Color.FromArgb(71, 85, 105);
-            _urlLabel.Location = new Point(20, 114);
-            _urlLabel.Size = new Size(380, 36);
-            _urlLabel.AutoEllipsis = true;
-            card.Controls.Add(_urlLabel);
-
-            Panel tip = RoundedCard(20, 304, 420, 58);
+            Label tip = new Label();
+            tip.Text = "保持运行即可。回到网站点「无线连接」。\nUSB 调试不需要本程序。";
+            tip.ForeColor = Theme.Muted;
+            tip.Location = new Point(18, 258);
+            tip.Size = new Size(364, 40);
             Controls.Add(tip);
-            Label tipText = new Label();
-            tipText.Text = "保持本窗口/托盘运行，回到网站点「无线连接」即可。\nUSB 调试不需要本程序。";
-            tipText.ForeColor = Color.FromArgb(51, 65, 85);
-            tipText.Location = new Point(16, 12);
-            tipText.Size = new Size(388, 40);
-            tip.Controls.Add(tipText);
 
-            Button openSite = MakeButton("打开搞机工具箱网站", 20, 380, 250, true);
+            Button openSite = MakeBtn("打开搞机工具箱网站", 18, 310, 364, true);
             openSite.Click += delegate { OpenUrl(Program.SiteUrl); };
             Controls.Add(openSite);
 
-            Button copyBtn = MakeButton("复制桥接地址", 280, 380, 160, false);
-            copyBtn.Click += delegate
-            {
-                try
-                {
-                    Clipboard.SetText(_bridge.PublicUrl);
-                    ShowBalloon("已复制", "桥接地址已复制。网站一般会自动探测，通常不用粘贴。");
-                }
-                catch { }
-            };
-            Controls.Add(copyBtn);
-
-            Button aboutBtn = MakeButton("关于 / 免责声明", 20, 426, 160, false);
-            aboutBtn.Click += delegate { ShowAbout(); };
-            Controls.Add(aboutBtn);
-
-            Button hideBtn = MakeButton("隐藏到托盘", 190, 426, 120, false);
+            Button hideBtn = MakeBtn("隐藏到托盘", 18, 356, 176, false);
             hideBtn.Click += delegate { HideToTray(); };
             Controls.Add(hideBtn);
 
-            Button exitBtn = MakeButton("退出", 320, 426, 120, false);
-            exitBtn.Click += delegate { Quit(); };
-            Controls.Add(exitBtn);
+            Button aboutBtn = MakeBtn("关于 / 开源", 206, 356, 176, false);
+            aboutBtn.Click += delegate { ShowAboutLite(); };
+            Controls.Add(aboutBtn);
 
-            LinkLabel oss = new LinkLabel();
-            oss.Text = "开源仓库 " + Program.RepoUrl;
-            oss.Location = new Point(20, 478);
-            oss.Size = new Size(420, 22);
-            oss.LinkColor = Color.FromArgb(13, 148, 136);
-            oss.ActiveLinkColor = Color.FromArgb(15, 118, 110);
-            oss.LinkClicked += delegate { OpenUrl(Program.RepoUrl); };
-            Controls.Add(oss);
+            LinkLabel foot = new LinkLabel();
+            foot.Text = "@" + Program.AuthorGithub + " · 开源仓库";
+            foot.LinkColor = Theme.Brand;
+            foot.ActiveLinkColor = Theme.BrandDark;
+            foot.Location = new Point(18, 398);
+            foot.Size = new Size(364, 18);
+            foot.LinkClicked += delegate { OpenUrl(Program.RepoUrl); };
+            Controls.Add(foot);
         }
 
-        private Panel RoundedCard(int x, int y, int w, int h)
-        {
-            Panel card = new Panel();
-            card.Location = new Point(x, y);
-            card.Size = new Size(w, h);
-            card.BackColor = Color.White;
-            card.Paint += delegate(object sender, PaintEventArgs e)
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Pen pen = new Pen(Color.FromArgb(226, 232, 240)))
-                using (GraphicsPath path = RoundRect(0, 0, card.Width - 1, card.Height - 1, 12))
-                {
-                    e.Graphics.DrawPath(pen, path);
-                }
-            };
-            return card;
-        }
-
-        private static GraphicsPath RoundRect(int x, int y, int w, int h, int r)
-        {
-            GraphicsPath path = new GraphicsPath();
-            int d = r * 2;
-            path.AddArc(x, y, d, d, 180, 90);
-            path.AddArc(x + w - d, y, d, d, 270, 90);
-            path.AddArc(x + w - d, y + h - d, d, d, 0, 90);
-            path.AddArc(x, y + h - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
-
-        private Button MakeButton(string text, int x, int y, int w, bool primary)
+        private Button MakeBtn(string text, int x, int y, int w, bool primary)
         {
             Button b = new Button();
             b.Text = text;
             b.Location = new Point(x, y);
-            b.Size = new Size(w, 36);
+            b.Size = new Size(w, 38);
             b.FlatStyle = FlatStyle.Flat;
             b.Cursor = Cursors.Hand;
-            b.Font = new Font("Microsoft YaHei UI", 9F);
             if (primary)
             {
-                b.BackColor = Color.FromArgb(13, 148, 136);
+                b.BackColor = Theme.Brand;
                 b.ForeColor = Color.White;
                 b.FlatAppearance.BorderSize = 0;
-                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(15, 118, 110);
+                b.FlatAppearance.MouseOverBackColor = Theme.BrandDark;
             }
             else
             {
-                b.BackColor = Color.White;
-                b.ForeColor = Color.FromArgb(15, 118, 110);
-                b.FlatAppearance.BorderColor = Color.FromArgb(153, 246, 228);
-                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 253, 250);
+                b.BackColor = Theme.Surface;
+                b.ForeColor = Theme.Brand;
+                b.FlatAppearance.BorderColor = Theme.BrandSoft;
             }
             return b;
         }
@@ -311,126 +230,32 @@ namespace GjBridge
             };
 
             ContextMenuStrip menu = new ContextMenuStrip();
-            menu.Items.Add("打开搞机工具箱网站", null, delegate { OpenUrl(Program.SiteUrl); });
-            menu.Items.Add("打开 GitHub", null, delegate { OpenUrl(Program.AuthorGithubUrl); });
-            menu.Items.Add("显示主窗口", null, delegate
+            menu.Items.Add("打开网站", null, delegate { OpenUrl(Program.SiteUrl); });
+            menu.Items.Add("显示窗口", null, delegate
             {
                 Show();
                 WindowState = FormWindowState.Normal;
                 Activate();
             });
-            menu.Items.Add("关于 / 免责声明", null, delegate { Show(); ShowAbout(); });
-            menu.Items.Add("复制桥接地址", null, delegate
-            {
-                try { Clipboard.SetText(_bridge.PublicUrl); } catch { }
-            });
+            menu.Items.Add("关于 / 开源", null, delegate { Show(); ShowAboutLite(); });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("退出", null, delegate { Quit(); });
             _tray.ContextMenuStrip = menu;
         }
 
-        private void ShowAbout()
+        private void ShowAboutLite()
         {
-            using (Form dlg = new Form())
-            {
-                dlg.Text = "关于 · 免责声明 · 开源";
-                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
-                dlg.StartPosition = FormStartPosition.CenterParent;
-                dlg.ClientSize = new Size(460, 520);
-                dlg.MaximizeBox = false;
-                dlg.MinimizeBox = false;
-                dlg.ShowIcon = true;
-                dlg.Icon = _appIcon;
-                dlg.BackColor = Color.White;
-                dlg.Font = Font;
-
-                Panel top = new Panel();
-                top.Dock = DockStyle.Top;
-                top.Height = 96;
-                top.Paint += delegate(object s, PaintEventArgs e)
-                {
-                    using (LinearGradientBrush br = new LinearGradientBrush(top.ClientRectangle,
-                        Color.FromArgb(15, 118, 110), Color.FromArgb(20, 184, 166), 20f))
-                        e.Graphics.FillRectangle(br, top.ClientRectangle);
-                };
-                dlg.Controls.Add(top);
-
-                if (_avatar != null)
-                {
-                    PictureBox pic = new PictureBox();
-                    pic.Image = _avatar;
-                    pic.SizeMode = PictureBoxSizeMode.Zoom;
-                    pic.Size = new Size(56, 56);
-                    pic.Location = new Point(18, 20);
-                    pic.Cursor = Cursors.Hand;
-                    pic.Click += delegate { OpenUrl(Program.AuthorGithubUrl); };
-                    top.Controls.Add(pic);
-                }
-
-                Label t1 = new Label();
-                t1.Text = Program.AppName;
-                t1.ForeColor = Color.White;
-                t1.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
-                t1.Location = new Point(88, 22);
-                t1.Size = new Size(350, 24);
-                t1.BackColor = Color.Transparent;
-                top.Controls.Add(t1);
-
-                Label t2 = new Label();
-                t2.Text = Program.AuthorName + "  @" + Program.AuthorGithub + "  ·  v" + Program.Version;
-                t2.ForeColor = Color.FromArgb(204, 251, 241);
-                t2.Location = new Point(88, 52);
-                t2.Size = new Size(350, 22);
-                t2.BackColor = Color.Transparent;
-                top.Controls.Add(t2);
-
-                TextBox box = new TextBox();
-                box.Multiline = true;
-                box.ReadOnly = true;
-                box.BorderStyle = BorderStyle.None;
-                box.BackColor = Color.White;
-                box.Location = new Point(18, 112);
-                box.Size = new Size(424, 340);
-                box.ScrollBars = ScrollBars.Vertical;
-                box.Text =
-                    "【这是什么】\r\n" +
-                    "本程序是「搞机工具箱 WebADB」的本机桥接器，只在 127.0.0.1 监听，\r\n" +
-                    "把网页的无线调试请求转给本机 adb，让浏览器能连局域网手机。\r\n" +
-                    "网站：" + Program.SiteUrl + "\r\n\r\n" +
-                    "【开源】\r\n" +
-                    "许可证：" + Program.LicenseName + "\r\n" +
-                    "本仓库：" + Program.RepoUrl + "\r\n" +
-                    "作者 GitHub：@" + Program.AuthorGithub + "  " + Program.AuthorGithubUrl + "\r\n" +
-                    "联系邮箱：" + Program.AuthorEmail + "\r\n" +
-                    "上游项目：" + Program.UpstreamUrl + "\r\n" +
-                    "欢迎 Star / Issue / PR。\r\n\r\n" +
-                    "【免责声明】\r\n" +
-                    "1. 本软件按「现状」提供，作者不对使用后果承担任何责任。\r\n" +
-                    "2. 请仅在您拥有或已获授权的设备上使用；勿用于未授权访问。\r\n" +
-                    "3. 无线调试、卸载、清数据、刷机相关操作可能导致数据丢失或系统异常，\r\n" +
-                    "   请自行备份并确认风险后再操作。\r\n" +
-                    "4. 本程序仅监听本机回环地址，不会把 ADB 流量发到云端；\r\n" +
-                    "   但您仍需自行保证电脑与网络安全。\r\n" +
-                    "5. 第三方杀软可能误报，属正常现象；源码已开源可供审计。\r\n" +
-                    "6. 继续使用即表示您已阅读并同意上述说明。\r\n\r\n" +
-                    "【隐私】\r\n" +
-                    "不收集账号密码；桥接 token 仅存本机本地目录。\r\n";
-                dlg.Controls.Add(box);
-
-                Button github = MakeButton("打开我的 GitHub", 18, 462, 150, true);
-                github.Click += delegate { OpenUrl(Program.AuthorGithubUrl); };
-                dlg.Controls.Add(github);
-
-                Button repo = MakeButton("打开开源仓库", 178, 462, 140, false);
-                repo.Click += delegate { OpenUrl(Program.RepoUrl); };
-                dlg.Controls.Add(repo);
-
-                Button ok = MakeButton("我知道了", 328, 462, 114, false);
-                ok.Click += delegate { dlg.Close(); };
-                dlg.Controls.Add(ok);
-
-                dlg.ShowDialog(this);
-            }
+            MessageBox.Show(
+                Program.AppName + "  v" + Program.Version + "\n" +
+                "作者：" + Program.AuthorName + "  @" + Program.AuthorGithub + "\n" +
+                "邮箱：" + Program.AuthorEmail + "\n" +
+                "开源：" + Program.RepoUrl + "\n" +
+                "网站：" + Program.SiteUrl + "\n" +
+                "许可：" + Program.LicenseName + "\n\n" +
+                "按「现状」提供，请仅在已授权设备上使用。",
+                "关于 / 开源",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void OnFormLoad(object sender, EventArgs e)
@@ -439,16 +264,14 @@ namespace GjBridge
             {
                 _bridge.Start();
                 RefreshStatus(true);
-                ShowBalloon("桥接已启动", "可以打开 " + Program.Brand + " 使用无线调试了");
+                ShowBalloon("桥接已启动", "可打开网站使用无线调试");
                 OpenUrl(Program.SiteUrl);
-                bool first = IsFirstRun();
-                if (_openAboutOnStart || first) ShowAbout();
             }
             catch (Exception ex)
             {
                 _statusTitle.Text = "启动失败";
                 _statusDetail.Text = ex.Message;
-                _dot.BackColor = Color.FromArgb(239, 68, 68);
+                _dot.BackColor = Theme.Err;
                 MessageBox.Show(ex.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
@@ -464,67 +287,36 @@ namespace GjBridge
             if (_bridge.IsRunning)
             {
                 _statusTitle.Text = "桥接运行中";
-                _statusDetail.Text = "监听 127.0.0.1:" + _bridge.Port + " · 仅本机可访问";
-                _dot.BackColor = Color.FromArgb(16, 185, 129);
+                _statusDetail.Text = "127.0.0.1:" + _bridge.Port + " · 仅本机";
+                _dot.BackColor = Theme.Ok;
                 _tray.Text = Program.AppName + " · 运行中";
             }
             else
             {
                 _statusTitle.Text = "未运行";
                 _statusDetail.Text = _bridge.LastError ?? "桥接未启动";
-                _dot.BackColor = Color.FromArgb(239, 68, 68);
+                _dot.BackColor = Theme.Err;
             }
 
             if (AdbRunner.AdbOk)
-                _adbLabel.Text = "ADB：已找到  " + ShortPath(AdbRunner.AdbPath);
+                _adbLabel.Text = "ADB 已就绪";
             else
-                _adbLabel.Text = "ADB：未找到（无线会失败，请装 platform-tools）";
-
-            _urlLabel.Text = "地址：" + _bridge.PublicUrl;
-        }
-
-        private static string ShortPath(string p)
-        {
-            if (string.IsNullOrEmpty(p)) return "";
-            if (p.Length <= 46) return p;
-            return "…" + p.Substring(p.Length - 44);
-        }
-
-        private static string FirstRunFlagPath()
-        {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "gj-toolbox-bridge");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "seen-about-v15.txt");
-        }
-
-        private static bool IsFirstRun()
-        {
-            try
-            {
-                string path = FirstRunFlagPath();
-                if (File.Exists(path)) return false;
-                File.WriteAllText(path, DateTime.Now.ToString("o"));
-                return true;
-            }
-            catch { return false; }
+                _adbLabel.Text = "未找到 adb.exe（请安装 platform-tools）";
         }
 
         private void OpenUrl(string url)
         {
-            try { Process.Start(url); }
+            try { Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true }); }
             catch
             {
-                try { Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true }); }
-                catch { }
+                try { Process.Start(url); } catch { }
             }
         }
 
         private void HideToTray()
         {
             Hide();
-            ShowBalloon("仍在后台运行", "右下角托盘可打开窗口或退出。网站可继续无线连接。");
+            ShowBalloon("后台运行中", "托盘图标可重新打开窗口");
         }
 
         private void ShowBalloon(string title, string text)
@@ -534,15 +326,14 @@ namespace GjBridge
                 _tray.BalloonTipTitle = title;
                 _tray.BalloonTipText = text;
                 _tray.BalloonTipIcon = ToolTipIcon.Info;
-                _tray.ShowBalloonTip(3500);
+                _tray.ShowBalloonTip(2800);
             }
             catch { }
         }
 
         private void OnResize(object sender, EventArgs e)
         {
-            if (WindowState == FormWindowState.Minimized)
-                HideToTray();
+            if (WindowState == FormWindowState.Minimized) HideToTray();
         }
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
