@@ -151,7 +151,8 @@ namespace GjBridge
                 catch { if (!IsRunning) break; continue; }
 
                 // fire-and-forget：每个 HTTP/WS 请求独立处理，不阻塞 Accept 循环
-                _ = Task.Factory.StartNew(() => HandleContext(ctx), CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
+                Task ignored = Task.Factory.StartNew(() => HandleContext(ctx), CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
+                if (ignored == null) { }
             }
         }
 

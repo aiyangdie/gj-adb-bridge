@@ -7,3 +7,4 @@ dist/
 _probe*
 _deploy*
 *.pdb
+release/搞机工具箱*.exe
